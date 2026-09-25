@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>PC 자산관리 스캐너</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel2: #263449; --accent: #38bdf8;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #334155; --danger: #f87171; --ok: #34d399;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex; flex-direction: column; min-height: 100%;
+  }
+  header {
+    padding: 14px 16px calc(10px + env(safe-area-inset-top, 0px));
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  main { flex: 1; padding: 12px 14px 90px; overflow-y: auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex;
+    background: var(--panel); border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 10;
+  }
+  .tabbar button {
+    flex: 1; background: none; border: none; color: var(--muted);
+    padding: 12px 0 10px; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .tabbar button.active { color: var(--accent); }
+  .tabbar button .ic { font-size: 19px; }
+  .btn {
+    display: inline-block; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 11px 16px;
+    font-size: 14px; margin: 6px 0; width: 100%; text-align: center;
+  }
+  .btn.primary { background: var(--accent); color: #06202e; border-color: var(--accent); font-weight: 600; }
+  .btn.secondary { background: transparent; }
+  .hidden { display: none !important; }
+  #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+  .card.small { padding: 10px 12px; margin: 8px 0; }
+  .field-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13.5px; border-bottom: 1px dashed var(--border); }
+  .field-row:last-child { border-bottom: none; }
+  .field-label { color: var(--muted); }
+  .field-value { text-align: right; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+  input, textarea { width: 100%; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 14px; }
+  h3 { margin: 4px 0 8px; font-size: 16px; }
+  h4 { margin: 14px 0 6px; font-size: 14px; color: var(--muted); }
+  .muted { color: var(--muted); font-size: 12.5px; }
+  #searchBox { margin-bottom: 10px; }
+  .list-item { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .li-title { font-size: 14.5px; font-weight: 600; }
+  .li-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 20; display: flex; align-items: flex-end; }
+  .modal.hidden { display: none; }
+  .modal-inner { background: var(--bg); width: 100%; max-height: 88vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 16px 16px calc(24px + env(safe-area-inset-bottom,0px)); }
+  .modal-top { display: flex; justify-content: flex-end; }
+  #toast { position: fixed; left: 50%; bottom: 78px; transform: translate(-50%, 12px); background: #0b1220; border: 1px solid var(--border); color: var(--text); padding: 9px 16px; border-radius: 20px; font-size: 13px; opacity: 0; transition: all .25s; z-index: 30; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .exp-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 6px 0 16px; }
+</style>
+</head>
+<body>
+
+<header><h1>📟 PC 자산관리 스캐너</h1></header>
+
+<main>
+  <!-- 스캔 탭 -->
+  <section id="tab-scan" class="tab-panel active">
+    <p class="muted">PC에 붙은 QR 라벨을 스캔하면 자동으로 조회/등록되고, 바로 점검 기록을 남길 수 있습니다.</p>
+    <button class="btn primary" id="scanStartBtn">📷 QR 스캔 시작</button>
+    <button class="btn hidden" id="scanStopBtn">■ 스캔 중지</button>
+    <div id="reader"></div>
+    <button class="btn secondary" id="manualBtn">⌨️ 자산번호 직접 입력 (QR 인식 불가 시)</button>
+    <div id="scanResult" class="hidden"></div>
+  </section>
+
+  <!-- 목록 탭 -->
+  <section id="tab-list" class="tab-panel">
+    <input type="text" id="searchBox" placeholder="자산번호 / 호스트 / IP / 위치 검색">
+    <div id="pcCount" class="muted" style="margin-bottom:8px;"></div>
+    <div id="pcList"></div>
+  </section>
+
+  <!-- 내보내기 탭 -->
+  <section id="tab-export" class="tab-panel">
+    <div class="card">
+      <h3>PC로 데이터 전송</h3>
+      <p class="exp-desc">
+        스캔·기록한 데이터를 CSV로 내려받은 뒤, 카카오톡/이메일/USB 등으로
+        PC에 전달하여 <b>PC 통합관리 프로그램</b>에서 가져오기(Import) 하세요.
+      </p>
+      <button class="btn primary" id="exportAllBtn">⬇️ PC 목록 + 점검이력 함께 내보내기</button>
+      <button class="btn" id="exportPcsBtn">PC 목록만 CSV로 내보내기</button>
+      <button class="btn" id="exportRepairsBtn">점검이력만 CSV로 내보내기</button>
+    </div>
+  </section>
+</main>
+
+<div class="tabbar">
+  <button data-tab="scan" class="active"><span class="ic">📷</span>스캔</button>
+  <button data-tab="list"><span class="ic">🗂️</span>목록</button>
+  <button data-tab="export"><span class="ic">⬇️</span>내보내기</button>
+</div>
+
+<div id="detailModal" class="modal hidden">
+  <div class="modal-inner">
+    <div class="modal-top"><button class="btn secondary" id="detailClose" style="width:auto;padding:8px 14px;">닫기 ✕</button></div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
