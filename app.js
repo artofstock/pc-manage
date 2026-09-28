@@ -123,18 +123,51 @@ function downloadText(filename, text) {
   URL.revokeObjectURL(url);
 }
 
-/* QR payload -> PC 레코드 매핑 (라벨 생성기와 동일 축약 키) */
+/* QR 해석: 신형 'PCM2|값|값|...' 과 구형 JSON 라벨을 모두 지원 */
+const QR_FIELDS = ["id", "host", "ip", "sn", "gw", "dns", "ipm", "mac", "os", "bld",
+  "osdate", "cpu", "mem", "hdd", "dom", "reg", "chk"];
+
+function parseQr(text) {
+  text = (text || "").trim();
+  if (text.startsWith("PCM2|")) {
+    const parts = text.split("|").slice(1);
+    const p = {};
+    QR_FIELDS.forEach((k, i) => (p[k] = parts[i] || ""));
+    return p;
+  }
+  return JSON.parse(text); // 구형 라벨(JSON)
+}
+
+function decodeIpMode(v) {
+  if (v === "D") return "DHCP(자동)";
+  if (v === "S") return "고정 IP";
+  return v || "";
+}
+function decodeDomain(v) {
+  if (!v) return "";
+  if (v.startsWith("D:")) return "도메인: " + v.slice(2);
+  if (v.startsWith("W:")) return "작업그룹: " + v.slice(2);
+  return v;
+}
+
+/* QR payload -> PC 레코드 매핑 */
 function payloadToPC(p) {
   return {
     pc_id: p.id,
     hostname: p.host || "",
     ip: p.ip || "",
     subnet: p.sn || "",
+    gateway: p.gw || "",
+    dns: (p.dns || "").replace(/,/g, ", "),
+    ip_mode: decodeIpMode(p.ipm),
+    mac: p.mac || "",
     os: p.os || "",
+    os_build: p.bld || "",
     os_install_date: p.osdate || "",
     cpu: p.cpu || "",
     memory: p.mem || "",
     storage: p.hdd || "",
+    domain: decodeDomain(p.dom),
     location: "",
     registered_date: p.reg || todayStr(),
     last_check_date: p.chk || todayStr(),
@@ -194,7 +227,7 @@ async function onScanSuccess(decodedText) {
   await stopScanner();
   let payload;
   try {
-    payload = JSON.parse(decodedText);
+    payload = parseQr(decodedText);
   } catch (e) {
     toast("QR 내용을 해석할 수 없습니다");
     return;
@@ -214,6 +247,14 @@ async function handleScannedPC(pcId, payload) {
     toast(`신규 PC 등록됨: ${pcId}`);
     renderScanResult(pc, true);
   } else {
+    // 기존 PC: 비어 있던 항목만 새 라벨 정보로 보충 (예: 구형 라벨 → 신형 라벨 재부착)
+    const fresh = payloadToPC(payload);
+    let changed = false;
+    Object.keys(fresh).forEach((k) => {
+      if (["registered_date", "last_check_date", "updated_at", "location", "notes", "pc_id"].includes(k)) return;
+      if (!existing[k] && fresh[k]) { existing[k] = fresh[k]; changed = true; }
+    });
+    if (changed) { existing.updated_at = nowStr(); await putPC(existing); toast("라벨의 새 정보로 보충했습니다"); }
     renderScanResult(existing, false);
   }
 }
@@ -232,8 +273,9 @@ function renderScanResult(pc, isNew) {
   box.appendChild(el("h3", null, (isNew ? "✅ 신규 등록: " : "📋 조회됨: ") + pc.pc_id));
   const info = el("div", "card");
   info.appendChild(fieldRow("호스트", pc.hostname));
-  info.appendChild(fieldRow("IP", pc.ip));
-  info.appendChild(fieldRow("OS", pc.os));
+  info.appendChild(fieldRow("IP", pc.ip + (pc.ip_mode ? ` (${pc.ip_mode})` : "")));
+  info.appendChild(fieldRow("MAC", pc.mac));
+  info.appendChild(fieldRow("OS", pc.os + (pc.os_build ? ` ${pc.os_build}` : "")));
   info.appendChild(fieldRow("CPU", pc.cpu));
   info.appendChild(fieldRow("메모리/저장", `${pc.memory} / ${pc.storage}`));
   info.appendChild(fieldRow("최근 점검일", pc.last_check_date));
@@ -333,7 +375,9 @@ async function openDetail(pcId) {
   body.appendChild(el("h3", null, pc.pc_id));
   const info = el("div", "card");
   [
-    ["호스트", pc.hostname], ["IP", pc.ip], ["서브넷", pc.subnet], ["OS", pc.os],
+    ["호스트", pc.hostname], ["IP", pc.ip], ["IP 할당", pc.ip_mode], ["서브넷", pc.subnet],
+    ["게이트웨이", pc.gateway], ["DNS", pc.dns], ["MAC", pc.mac], ["도메인/작업그룹", pc.domain],
+    ["OS", pc.os], ["OS 빌드", pc.os_build],
     ["OS 설치일", pc.os_install_date], ["CPU", pc.cpu], ["메모리", pc.memory],
     ["저장장치", pc.storage], ["위치", pc.location], ["등록일", pc.registered_date],
     ["최근 점검일", pc.last_check_date],
@@ -395,8 +439,9 @@ function openEditForm(pc) {
 $("#detailClose").addEventListener("click", () => $("#detailModal").classList.add("hidden"));
 
 /* ---------------- 내보내기 ---------------- */
-const PC_COLS = ["pc_id", "hostname", "ip", "subnet", "os", "os_install_date", "cpu",
-  "memory", "storage", "location", "registered_date", "last_check_date", "notes", "updated_at"];
+const PC_COLS = ["pc_id", "hostname", "ip", "subnet", "gateway", "dns", "ip_mode", "mac",
+  "os", "os_build", "os_install_date", "cpu", "memory", "storage", "domain",
+  "location", "registered_date", "last_check_date", "notes", "updated_at"];
 const REPAIR_COLS = ["pc_id", "repair_date", "issue", "action", "technician", "source", "client_id"];
 
 $("#exportPcsBtn").addEventListener("click", async () => {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "pc-mgmt-cache-v1";
+const CACHE_NAME = "pc-mgmt-cache-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
