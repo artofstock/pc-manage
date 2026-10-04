@@ -71,6 +71,21 @@
   .modal-top { display: flex; justify-content: flex-end; }
   #toast { position: fixed; left: 50%; bottom: 78px; transform: translate(-50%, 12px); background: #0b1220; border: 1px solid var(--border); color: var(--text); padding: 9px 16px; border-radius: 20px; font-size: 13px; opacity: 0; transition: all .25s; z-index: 30; }
   #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .btn.danger { color: var(--danger); border-color: #7f3a3a; background: transparent; }
+  .btn.small { width: auto; padding: 8px 14px; font-size: 13px; margin: 4px 0; }
+  .btn:disabled { opacity: .5; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+  .btn-row .btn { flex: 1; width: auto; }
+  .card.warn { border-color: #b7791f; }
+  .diff-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); color: var(--text); font-size: 13.5px; margin: 0; }
+  .diff-row:last-of-type { border-bottom: none; }
+  .diff-text { flex: 1; word-break: break-all; }
+  .diff-name { font-weight: 600; }
+  .diff-old { color: var(--muted); text-decoration: line-through; }
+  .diff-new { color: var(--ok); }
+  .opt-row { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 13.5px; margin: 6px 0; }
+  input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; }
+  select { width: 100%; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 14px; }
   .exp-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 6px 0 16px; }
 </style>
 </head>
@@ -99,7 +114,7 @@
   <!-- 내보내기 탭 -->
   <section id="tab-export" class="tab-panel">
     <div class="card">
-      <h3>PC로 데이터 전송</h3>
+      <h3>데이터 내보내기</h3>
       <p class="exp-desc">
         스캔·기록한 데이터를 CSV로 내려받은 뒤, 카카오톡/이메일/USB 등으로
         PC에 전달하여 <b>PC 통합관리 프로그램</b>에서 가져오기(Import) 하세요.
@@ -108,13 +123,23 @@
       <button class="btn" id="exportPcsBtn">PC 목록만 CSV로 내보내기</button>
       <button class="btn" id="exportRepairsBtn">점검이력만 CSV로 내보내기</button>
     </div>
+    <div class="card">
+      <h3>데이터 불러오기</h3>
+      <p class="exp-desc">
+        내보내기로 만든 CSV(PC 목록 / 점검이력)를 선택하면 현재 데이터와 비교한 <b>미리보기</b>를 보여 주고,
+        확인 후 병합합니다. 두 파일을 한꺼번에 선택해도 됩니다. 같은 점검이력은 중복 없이 한 번만 들어옵니다.
+      </p>
+      <input type="file" id="importFile" accept=".csv,text/csv" multiple class="hidden">
+      <button class="btn primary" id="importBtn">⬆️ CSV 파일 불러오기</button>
+      <div id="importPreview" class="hidden"></div>
+    </div>
   </section>
 </main>
 
 <div class="tabbar">
   <button data-tab="scan" class="active"><span class="ic">📷</span>스캔</button>
   <button data-tab="list"><span class="ic">🗂️</span>목록</button>
-  <button data-tab="export"><span class="ic">⬇️</span>내보내기</button>
+  <button data-tab="export"><span class="ic">💾</span>데이터</button>
 </div>
 
 <div id="detailModal" class="modal hidden">
