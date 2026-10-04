@@ -1015,10 +1015,28 @@ $("#importFile").addEventListener("change", async (e) => {
   await renderImportPreview();
 });
 
+/* ---------------- 버전 표시 ---------------- */
+const APP_VERSION = "v3 · 수정/삭제/불러오기";
+{
+  const v = $("#appVer");
+  if (v) v.textContent = APP_VERSION;
+}
+
 /* ---------------- Service worker 등록 ---------------- */
 if ("serviceWorker" in navigator) {
+  // 새 버전의 서비스워커가 넘겨받으면 한 번만 자동으로 새로고침해서 새 화면을 바로 보여 준다
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => reg.update())
+      .catch(() => {});
   });
 }
 
